@@ -1,3 +1,3 @@
-#header
+#subnewsbot
 
-header, not, a freak show
+Reddit subreddit newletter bot. Not yet ready.
