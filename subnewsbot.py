@@ -1,4 +1,4 @@
-import praw, time, ConfigParser, re, readline, thread, sys, os, glob
+import praw, time, ConfigParser, re, readline, thread, sys, os, glob, shutil
 
 run = True
 
@@ -17,12 +17,9 @@ class Config():
 		self.config.set('config', 'password', self.password)
 		self.config.set('config', 'useragent', self.useragent)
 		self.config.set('config', 'sub', self.sub)
-		self.config.set('config', 'signature_show', str(self.signature_show))
 		self.config.set('config', 'signature', self.signature)
 		self.config.set('config', 'log', str(self.log))
 		self.config.set('config', 'date_format', self.date_format)
-		self.config.set('data', 'next_issue', self.next_issue)
-		self.config.set('data', 'next', self.next)
 		self.config.set('data', 'allowed', self.allowed)
 		self.config.set('data', 'subscribed', self.subscribed)
 		self.config.set('data', 'admins', self.admins)
@@ -36,12 +33,9 @@ class Config():
 		self.password = self.config.get('config', 'password')
 		self.useragent = self.config.get('config', 'useragent')
 		self.sub = self.config.get('config', 'sub')
-		self.signature_show = self.config.getboolean('config', 'signature_show')
 		self.signature = self.config.get('config', 'signature')
 		self.log = self.config.getboolean('config', 'log')
 		self.date_format = self.config.get('config', 'date_format')
-		self.next_issue = self.config.get('data', 'next_issue')
-		self.next = self.config.get('data', 'next')
 		self.allowed = self.config.get('data', 'allowed')
 		self.subscribed = self.config.get('data', 'subscribed')
 		self.admins = self.config.get('data', 'admins')
@@ -85,7 +79,7 @@ class Users():
 			if config.subscribed[0:1] == ',': # stop single comma problem
 				config.subscribed = config.subscribed[1:]
 			output('unsubscribed %s' % username)
-		except ValueError: # if username not found, pass
+		except ValueError: # if username not found, ignore
 			output('%s not found in subscribed' % username)
 
 	def adminify_user(self, username):
@@ -111,7 +105,7 @@ class Users():
 			if config.admins[0:1] == ',': # stop single comma problem
 				config.admins = config.admins[1:]
 			output('%s is no longer an admin' % username)
-		except ValueError: # if username not found, pass
+		except ValueError: # if username not found, ignore
 			output('%s not found in admins' % username)
 
 	def __init__(self):
@@ -122,17 +116,36 @@ users = Users()
 class Message:
 	"""creates a Message, with issue name to get all the message's elements"""
 
+	def send_issue(self, receivers):
+		"""move to sent then send issue to all subscribers"""
+		shutil.move(self.data['file'], 'messages/sent/%s' % self.data['file'].split('/')[:-1])
+		for user in receivers:
+			self.parse(user)
+			r.send_message(user, self.data['subject'], self.data['body'])
+		output('sent issue to %i users' % len(receivers))
+
+	def parse(self, username):
+		"""parse message with info"""
+		replacements = {
+			'sub': config.sub,
+			'user': username,
+			'signature': config.signature
+		}
+		for keys in replacements.keys():
+			self.data['subject'] = self.data['subject'].replace('%%%s%%' % keys, replacements[keys])
+			self.data['body'] = self.data['body'].replace('%%%s%%' % keys, replacements[keys])
+
 	def get_messages(self):
 		"""return all messages"""
 		messages = {}
 		queue = {}
 		sent = {}
 		for message in glob.glob('messages/*.msg'):
-			messages[message.split('/')[-1:][0]] = Message(message)#.data
+			messages[message.split('/')[-1:][0]] = Message(message)
 		for message in glob.glob('messages/queue/*.msg'):
-			queue[message.split('/')[-1:][0]] = Message(message)#.data
+			queue[message.split('/')[-1:][0]] = Message(message)
 		for message in glob.glob('messages/sent/*.msg'):
-			sent[message.split('/')[-1:][0]] = Message(message)#.data
+			sent[message.split('/')[-1:][0]] = Message(message)
 		return (messages, queue, sent)
 
 	def get_date(self):
@@ -153,15 +166,16 @@ class Message:
 	def get_body(self):
 		"""returns message body"""
 		if self.data['date']:
-			return self.data['raw'].splitlines()[2:]
+			return '\n'.join(self.data['raw'].splitlines()[2:])
 		else:
-			return self.data['raw'].splitlines()[1:]
+			return '\n'.join(self.data['raw'].splitlines()[1:])
 
 	def __init__(self, message = None):
 		if message:
 			self.data = {}
 			with open(message) as f:
 				self.data['raw'] = f.read()
+			self.data['file'] = message
 			self.data['date'] = self.get_date()
 			self.data['subject'] = self.get_subject()
 			self.data['body'] = self.get_body()
@@ -188,6 +202,28 @@ class Commands():
 		if not found and arguments:
 			output('  command not found')
 
+	def reload(self, arguments):
+		output('reloading data and config')
+		global config
+		config.load()
+
+	def kill(self, arguments):
+		output('saving')
+		config.save()
+		output('killing the bot')
+		global run
+		run = False
+
+	def list(self, arguments):
+		"""list all sent issues"""
+		for message in sent:
+			output(message[:-4])
+
+	def admins(self, arguments):
+		"""list admins"""
+		for admin in users.get_admins():
+			output(admin)
+
 	def adminify(self, arguments):
 		"""adminify user(s)"""
 		if arguments:
@@ -208,22 +244,10 @@ class Commands():
 			output('incorrect arguments')
 			self.help(['unadminify'])
 
-	def reload(self, arguments):
-		output('reloading data and config')
-		global config
-		config.load()
-
-	def kill(self, arguments):
-		output('saving')
-		config.save()
-		output('killing the bot')
-		global run
-		run = False
-
-	def list(self, arguments):
-		"""list all sent issues"""
-		for message in sent:
-			output(message[:-4])
+	def subscribed(self, arguments):
+		"""list subscribers"""
+		for subscriber in users.get_subscribers():
+			output(subscriber)
 
 	def subscribe(self, arguments):
 		"""subscribe user(s)"""
@@ -248,16 +272,38 @@ class Commands():
 	def __init__(self):
 		self.commands = [
 			('help', 'display command help', '[command]', self.help),
-			('adminify', 'add user(s) to admins', 'username[,username ...]', self.adminify),
-			('unadminify', 'remove user(s) from admins', 'username[,username ...]', self.unadminify),
 			('reload', 'reloads the data and config', None, self.reload),
 			('kill', 'safely kill the bot', None, self.kill),
 			('list', 'list all issues', None, self.list),
+			('admins', 'list admins', None, self.admins),
+			('adminify', 'add user(s) to admins', 'username[,username ...]', self.adminify),
+			('unadminify', 'remove user(s) from admins', 'username[,username ...]', self.unadminify),
+			('subscribed', 'list subscribers', None, self.subscribed),
 			('subscribe', 'subscribe user(s) to newsletter', 'username[,username ...]', self.subscribe),
 			('unsubscribe', 'unsubscribe(s) user from newsletter', 'username[,username ...]', self.unsubscribe)
 		]
 
 commands = Commands().commands
+
+output('subnewsbot by /u/zeokila')
+r = praw.Reddit('starting bot') # praw reddit instance
+
+def init():
+	output('logging in')
+	r.login(config.username, config.password)
+	output('logged in')
+	output('checking')
+	check()
+
+def check():
+	"""runs every 2 seconds and checks for continuously updated stuff"""
+	for message in queue:
+		if time.mktime(queue[message].get_date()) <= time.time():
+			queue[message].send_issue(users.get_subscribers()) # the issues receiver is all the subscribers
+	time.sleep(2)
+	thread.start_new_thread(check, ())
+
+init()
 
 while run:
 	i = raw_input('\r>').split(' ') # split to gather arguments
