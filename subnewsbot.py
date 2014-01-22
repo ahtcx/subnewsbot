@@ -1,4 +1,4 @@
-import praw, time, ConfigParser, re, readline, thread, sys, os, glob, shutil
+import praw, time, ConfigParser, readline, thread, sys, glob, shutil
 
 run = True
 
