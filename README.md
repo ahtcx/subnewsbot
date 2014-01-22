@@ -38,9 +38,9 @@ Command | Parameters | Action
 
 ----------
 ##Message files
-Example message with explanations (in real messages, '#' are *not* counted as comments!)
+Example message with explanations (in real messages, there are *no* comments!). Messages have a `.msg` extension. All messages in `messages/queue/` should have a date, to be sent off on that date. All messages in `messages/sent/` are acessable to all.
 
-    hh:mm.dd/mm/yyyy (optional line, if no date, move everything up one line, depends on time format from settings!)
+    %H:%M %d/%m/%Y (optional line, if no date, move everything up one line, depends on time format from settings!)
     This is the messages subject
     Hi %user% this is the message body!
     #Header
