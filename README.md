@@ -14,9 +14,9 @@ Example of a configuration file with explanations
     [data]
     subscribed = zeokila
 
-----------
 ##User commands
 User commands sent though messages to the bot, the command is in the subject, the parameters are in the body
+
 Command | Parameters | Action
 --- | --- | ---
 `subscribe` | none | Subscribes the message sender to future newsletters
@@ -25,6 +25,7 @@ Command | Parameters | Action
 `get` | `issue[,issue ...]` | Sends the user all found issues from specified issues
 ##Console commands
 These commands are entered on the script's host's input
+
 Command | Parameters | Action
 --- | --- | ---
 `help` | `[command]` | Lists all console commands and their description, or lists help and usage to specific commad
@@ -35,8 +36,6 @@ Command | Parameters | Action
 `subscribe` | `user[,user ...]` | Subscribe user(s)
 `unsubscribe` | `user[,user ...]` | Unubscribe user(s)
 
-
-----------
 ##Message files
 Example message with explanations (in real messages, there are *no* comments!). Messages have a `.msg` extension. All messages in `messages/queue/` should have a date, to be sent off on that date. All messages in `messages/sent/` are acessable to all.
 
