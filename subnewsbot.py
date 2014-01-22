@@ -20,7 +20,6 @@ class Config():
 		self.config.set('config', 'signature', self.signature)
 		self.config.set('config', 'log', str(self.log))
 		self.config.set('config', 'date_format', self.date_format)
-		self.config.set('data', 'allowed', self.allowed)
 		self.config.set('data', 'subscribed', self.subscribed)
 		self.config.set('data', 'admins', self.admins)
 		config = open('subnewsbot.cfg', 'w')
@@ -36,7 +35,6 @@ class Config():
 		self.signature = self.config.get('config', 'signature')
 		self.log = self.config.getboolean('config', 'log')
 		self.date_format = self.config.get('config', 'date_format')
-		self.allowed = self.config.get('data', 'allowed')
 		self.subscribed = self.config.get('data', 'subscribed')
 		self.admins = self.config.get('data', 'admins')
 
@@ -49,6 +47,14 @@ config = Config()
 
 class Users():
 	"""everything you need to handle users"""
+
+	def is_admin(self):
+		"""returns if user is an admin"""
+		try:
+			self.get_admins().index[username]
+			return True
+		except ValueError:
+			return False
 
 	def get_subscribers(self): # return list of subscribers usernames
 		return config.subscribed.split(',')
@@ -68,8 +74,10 @@ class Users():
 				config.subscribed = config.subscribed[1:]
 			added = True
 			output('subscribed %s' % username)
+			return True
 		if not added:
 			output('%s already subscribed' % username)
+			return False
 
 	def unsubscribe_user(self, username):
 		subscribed = self.get_subscribers()
@@ -79,8 +87,10 @@ class Users():
 			if config.subscribed[0:1] == ',': # stop single comma problem
 				config.subscribed = config.subscribed[1:]
 			output('unsubscribed %s' % username)
+			return True
 		except ValueError: # if username not found, ignore
 			output('%s not found in subscribed' % username)
+			return False
 
 	def adminify_user(self, username):
 		admins = self.get_admins()
@@ -113,40 +123,8 @@ class Users():
 
 users = Users()
 
-class Message:
-	"""creates a Message, with issue name to get all the message's elements"""
-
-	def send_issue(self, receivers):
-		"""move to sent then send issue to all subscribers"""
-		shutil.move(self.data['file'], 'messages/sent/%s' % self.data['file'].split('/')[:-1])
-		for user in receivers:
-			self.parse(user)
-			r.send_message(user, self.data['subject'], self.data['body'])
-		output('sent issue to %i users' % len(receivers))
-
-	def parse(self, username):
-		"""parse message with info"""
-		replacements = {
-			'sub': config.sub,
-			'user': username,
-			'signature': config.signature
-		}
-		for keys in replacements.keys():
-			self.data['subject'] = self.data['subject'].replace('%%%s%%' % keys, replacements[keys])
-			self.data['body'] = self.data['body'].replace('%%%s%%' % keys, replacements[keys])
-
-	def get_messages(self):
-		"""return all messages"""
-		messages = {}
-		queue = {}
-		sent = {}
-		for message in glob.glob('messages/*.msg'):
-			messages[message.split('/')[-1:][0]] = Message(message)
-		for message in glob.glob('messages/queue/*.msg'):
-			queue[message.split('/')[-1:][0]] = Message(message)
-		for message in glob.glob('messages/sent/*.msg'):
-			sent[message.split('/')[-1:][0]] = Message(message)
-		return (messages, queue, sent)
+class Message():
+	"""Message instance (w/ date, subject, body, file)"""
 
 	def get_date(self):
 		"""returns send date"""
@@ -154,7 +132,6 @@ class Message:
 			return time.strptime(self.data['raw'].splitlines()[0], config.date_format)
 		except ValueError:
 			return None
-
 
 	def get_subject(self):
 		"""returns message subject"""
@@ -170,20 +147,81 @@ class Message:
 		else:
 			return '\n'.join(self.data['raw'].splitlines()[1:])
 
-	def __init__(self, message = None):
-		if message:
-			self.data = {}
-			with open(message) as f:
-				self.data['raw'] = f.read()
-			self.data['file'] = message
-			self.data['date'] = self.get_date()
-			self.data['subject'] = self.get_subject()
-			self.data['body'] = self.get_body()
+	def __init__(self, message):
+		self.data = {}
+		self.data['file'] = message
+		with open(message) as f:
+			self.data['raw'] = f.read()
+		self.data['date'] = self.get_date()
+		self.data['subject'] = self.get_subject()
+		self.data['body'] = self.get_body()
 
-(messages, queue, sent) = Message().get_messages()
+class Messages():
+	"""Message handling here"""
 
-#for message in queue:
-#	output(queue[message].get_date())
+	def set_messages(self):
+		"""updates messages, queue and sent"""
+		for message in glob.glob('messages/*.msg'):
+			self.messages[message.split('/')[-1]] = Message(message)
+		for message in glob.glob('messages/queue/*.msg'):
+			self.queue[message.split('/')[-1]] = Message(message)
+		for message in glob.glob('messages/sent/*.msg'):
+			self.sent[message.split('/')[-1]] = Message(message)
+
+	def set_content(self, message, username, listed = None):
+		"""set message with info/content"""
+		replacements = {
+			'sub': config.sub,
+			'subreddit': config.sub,
+			'user': username,
+			'username': username,
+			'signature': config.signature,
+		}
+		if listed:
+			replacements += {
+				'list': listed
+			}
+		for keys in replacements.keys():
+			message.data['subject'] = message.data['subject'].replace('%%%s%%' % keys, replacements[keys])
+			message.data['body'] = message.data['body'].replace('%%%s%%' % keys, replacements[keys])
+
+	def send(self, message, receivers, listed = None):
+		"""move to sent then send issue to all subscribers"""
+		if  message.data['file'].split('/')[1] == 'queue': # if it was queued, move to sent
+			shutil.move(message.data['file'], 'messages/sent/%s' % message.data['file'].split('/')[-1])
+			self.set_messages()
+		for user in receivers:
+			self.set_content(message, user, listed)
+			r.send_message(user, message.data['subject'], message.data['body'])
+		output('sent %s to %i users' % (message.data['file'], len(receivers)))
+
+	def parse(self, message):
+		"""parse user command from message"""
+		if message.subject == 'subscribe':
+			users.subscribe_user(message.author.name)
+			self.send(self.messages['subscribed.msg'], [message.author.name])
+		elif message.subject == 'unsubscribe':
+			users.unsubscribe_user(message.author.name)
+			self.send(self.messages['unsubscribed.msg'], [message.author.name])
+		elif message.subject == 'get':
+			for m in message.body.split(','):
+				try:
+					self.send(self.sent['%s.msg' % m], [message.author.name])
+				except:
+					pass
+		elif message.subject == 'list':
+			listed = ''
+			for m in self.sent:
+				listed += ',%s' % self.sent[m].data['file'].split('/')[-1:][0].split('.')[0]
+			self.send(self.messages['list.msg'], [message.author.name], listed[1:])
+		else:
+			pass
+
+	def __init__(self):
+		(self.messages, self.queue, self.sent) = ({}, {}, {})
+		self.set_messages()
+
+messages = Messages()
 
 class Commands():
 	"""creates a Commands initialised with the commands, their help and their respective function"""
@@ -216,7 +254,7 @@ class Commands():
 
 	def list(self, arguments):
 		"""list all sent issues"""
-		for message in sent:
+		for message in messages.sent:
 			output(message[:-4])
 
 	def admins(self, arguments):
@@ -297,10 +335,13 @@ def init():
 
 def check():
 	"""runs every 2 seconds and checks for continuously updated stuff"""
-	for message in queue:
-		if time.mktime(queue[message].get_date()) <= time.time():
-			queue[message].send_issue(users.get_subscribers()) # the issues receiver is all the subscribers
-	time.sleep(2)
+	for message in r.get_unread(limit = None):
+		Messages().parse(message)
+		message.mark_as_read()
+	for message in messages.queue:
+		if time.mktime(messages.queue[message].get_date()) <= time.time():
+			messages.queue[message].send_issue(users.get_subscribers()) # the issues receiver is all the subscribers
+	time.sleep(10)
 	thread.start_new_thread(check, ())
 
 init()
