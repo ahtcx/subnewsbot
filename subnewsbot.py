@@ -215,7 +215,7 @@ class Messages():
 				listed += ',%s' % self.sent[m].data['file'].split('/')[-1:][0].split('.')[0]
 			self.send(self.messages['list.msg'], [message.author.name], listed[1:])
 		else:
-			pass
+			self.send(self.messages['help.msg'], [message.author.name])
 
 	def __init__(self):
 		(self.messages, self.queue, self.sent) = ({}, {}, {})
