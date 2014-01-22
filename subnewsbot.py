@@ -18,10 +18,10 @@ class Config():
 		self.config.set('config', 'useragent', self.useragent)
 		self.config.set('config', 'sub', self.sub)
 		self.config.set('config', 'signature', self.signature)
-		self.config.set('config', 'log', str(self.log))
+		# TODO self.config.set('config', 'log', str(self.log))
 		self.config.set('config', 'date_format', self.date_format)
 		self.config.set('data', 'subscribed', self.subscribed)
-		self.config.set('data', 'admins', self.admins)
+		# TODO self.config.set('data', 'admins', self.admins)
 		config = open('subnewsbot.cfg', 'w')
 		self.config.write(config)
 		config.close()
@@ -33,10 +33,10 @@ class Config():
 		self.useragent = self.config.get('config', 'useragent')
 		self.sub = self.config.get('config', 'sub')
 		self.signature = self.config.get('config', 'signature')
-		self.log = self.config.getboolean('config', 'log')
+		# TODO self.log = self.config.getboolean('config', 'log')
 		self.date_format = self.config.get('config', 'date_format')
 		self.subscribed = self.config.get('data', 'subscribed')
-		self.admins = self.config.get('data', 'admins')
+		# TODO self.admins = self.config.get('data', 'admins')
 
 	def __init__(self):
 		self.config = ConfigParser.ConfigParser()
@@ -241,7 +241,7 @@ class Commands():
 			output('  command not found')
 
 	def reload(self, arguments):
-		output('reloading data and config')
+		output('reloading config')
 		global config
 		config.load()
 
@@ -310,12 +310,12 @@ class Commands():
 	def __init__(self):
 		self.commands = [
 			('help', 'display command help', '[command]', self.help),
-			('reload', 'reloads the data and config', None, self.reload),
+			('reload', 'reloads config', None, self.reload),
 			('kill', 'safely kill the bot', None, self.kill),
 			('list', 'list all issues', None, self.list),
-			('admins', 'list admins', None, self.admins),
-			('adminify', 'add user(s) to admins', 'username[,username ...]', self.adminify),
-			('unadminify', 'remove user(s) from admins', 'username[,username ...]', self.unadminify),
+			# TODO ('admins', 'list admins', None, self.admins),
+			# TODO ('adminify', 'add user(s) to admins', 'username[,username ...]', self.adminify),
+			# TODO ('unadminify', 'remove user(s) from admins', 'username[,username ...]', self.unadminify),
 			('subscribed', 'list subscribers', None, self.subscribed),
 			('subscribe', 'subscribe user(s) to newsletter', 'username[,username ...]', self.subscribe),
 			('unsubscribe', 'unsubscribe(s) user from newsletter', 'username[,username ...]', self.unsubscribe)
