@@ -1,3 +1,7 @@
+> **Project no longer maintained! I strongly discourage using it.**
+
+---
+
 # subnewsbot
 
 subnewsbot is a Python bot aimed for subreddits, where you can send out a customised newsletter to all those who've subscribed to the newsletter. It has simple commands users can use to interact with it.
